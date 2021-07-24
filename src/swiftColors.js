@@ -6,73 +6,82 @@ var camelCase = require('camel-case')
 // Public functions
 
 function getColorsSwiftSnippet(context, forExport) {
-  const colors = utils.getResources(context, "colors");
+   const colors = utils.getResources(context, "colors");
 
-  //Loop on every color
-  var colorsCode = "";
-  for (var color of colors){
-    colorsCode += utils.tab(2) + getColorDeclarationSwiftCode(context, color, forExport) + "\n";
-  }
+   //Loop on every color
+   var colorsCode = "";
+   for (var color of colors) {
+      colorsCode += utils.tab(2) + getColorDeclarationSwiftCode(context, color, forExport) + "\n";
+   }
 
-  //Wrap colors code in an extension
-  var code = "extension " + getColorSwiftType(context, forExport) + " {\n";
-  code += utils.tab(1) + "struct " + getColorStructName(context) + " {\n";
-  code += colorsCode;
-  code += utils.tab(1) + "}\n";
-  code += "}";
+   //Wrap colors code in an extension
+   var code = "extension " + getColorSwiftType(context, forExport) + " {\n";
+   code += utils.tab(1) + "struct " + getColorStructName(context) + " {\n";
+   code += colorsCode;
+   code += utils.tab(1) + "}\n";
+   code += "}";
 
-  return code;
+   return code;
 }
 
 function getColorsSwiftFileContent(context) {
-  //Add import to the snippet
-  var code = getSwiftColorImport();
-  code += getColorsSwiftSnippet(context, true);
+   //Add import to the snippet
+   var code = getSwiftColorImport(context);
+   code += getColorsSwiftSnippet(context, true);
 
-  const colorFormat = context.getOption("colorFormat");
-  if (colorFormat == "rgb") {
-    return code;
-  }
+   const colorFormat = context.getOption("colorFormat");
+   if (colorFormat == "rgb") {
+      return code;
+   }
 
-  //Add the color hex init
-  const alphaFirst = context.getOption("colorFormat") == "hex_argb"
-  code += "\n\n" + getSwiftHexColorExtension(context, alphaFirst);
+   //Add the color hex init
+   const alphaFirst = context.getOption("colorFormat") == "hex_argb"
+   code += "\n\n" + getSwiftHexColorExtension(context, alphaFirst);
 
-  return code
+   return code
 }
 
 function getExistingColorSwiftCode(context, color, forExport) {
-  const colorSwiftType = getColorSwiftType(context, forExport)
-  return `${colorSwiftType}.${getColorStructName(context)}.${camelCase(color.name)}`;
+   const colorSwiftType = getColorSwiftType(context, forExport)
+   return `${colorSwiftType}.${getColorStructName(context)}.${camelCase(color.name)}`;
 }
 
 function getColorSwiftCode(context, color, forExport) {
-  const formatOption = context.getOption("colorFormat");
-  const colorSwiftType = getColorSwiftType(context, forExport)
-  if (formatOption == "rgb") {
-    return `${colorSwiftType}(red: ${color.r}/255.0, green: ${color.g}/255.0, blue: ${color.b}/255.0, alpha: ${color.a})`;
-  }
+   const frameworkOption = context.getOption("snippetFramework");
+   if (frameworkOption == "forceSwiftUI") {
+      return `${colorSwiftType}(red: ${color.r}/255.0, green: ${color.g}/255.0, blue: ${color.b}/255.0, opacity: ${color.a})`;
+   }
+   const formatOption = context.getOption("colorFormat");
+   const colorSwiftType = getColorSwiftType(context, forExport)
+   if (formatOption == "rgb") {
+      return `${colorSwiftType}(red: ${color.r}/255.0, green: ${color.g}/255.0, blue: ${color.b}/255.0, alpha: ${color.a})`;
+   }
 
-  const hexColor = color.toHex();
-  if (formatOption == "hex_rgba") {
-    const parameterName = getSwiftHexInitParameterName(false);
-    return `${colorSwiftType}(${parameterName}:0x${hexColor.r}${hexColor.g}${hexColor.b}${hexColor.a})`;
-  } else if (formatOption == "hex_argb") {
-    const parameterName = getSwiftHexInitParameterName(true);
-    return `${colorSwiftType}(${parameterName}:0x${hexColor.a}${hexColor.r}${hexColor.g}${hexColor.b})`;
-  }
+   const hexColor = color.toHex();
+   if (formatOption == "hex_rgba") {
+      const parameterName = getSwiftHexInitParameterName(false);
+      return `${colorSwiftType}(${parameterName}:0x${hexColor.r}${hexColor.g}${hexColor.b}${hexColor.a})`;
+   } else if (formatOption == "hex_argb") {
+      const parameterName = getSwiftHexInitParameterName(true);
+      return `${colorSwiftType}(${parameterName}:0x${hexColor.a}${hexColor.r}${hexColor.g}${hexColor.b})`;
+   }
 }
 
 function getColorStructName(context) {
-  var structName = context.getOption("colorStructName");
-  if (structName == "") {
-    structName = utils.capitalize(camelCase(context.project.name));
-  }
-  return structName;
+   var structName = context.getOption("colorStructName");
+   if (structName == "") {
+      structName = utils.capitalize(camelCase(context.project.name));
+   }
+   return structName;
 }
 
-function getSwiftColorImport() {
-  return `#if os(OSX)
+function getSwiftColorImport(context) {
+   const frameworkOption = context.getOption("snippetFramework");
+   if (frameworkOption == "forceSwiftUI") {
+      return `import Color`;
+   }
+
+   return `#if os(OSX)
   import AppKit.NSColor
   internal typealias Color = NSColor
 #elseif os(iOS) || os(tvOS) || os(watchOS)
@@ -83,53 +92,56 @@ function getSwiftColorImport() {
 `;
 }
 
-module.exports = { getColorsSwiftSnippet,
-  getColorsSwiftFileContent,
-  getColorSwiftCode,
-  getExistingColorSwiftCode,
-  getColorStructName,
-  getSwiftColorImport
+module.exports = {
+   getColorsSwiftSnippet,
+   getColorsSwiftFileContent,
+   getColorSwiftCode,
+   getExistingColorSwiftCode,
+   getColorStructName,
+   getSwiftColorImport
 };
 
 // Private functions
 
 function getColorSwiftType(context, forExport) {
-  if (forExport) {
-    return "Color";
-  }
+   if (forExport) {
+      return "Color";
+   }
 
-  const frameworkOption = context.getOption("snippetFramework");
+   const frameworkOption = context.getOption("snippetFramework");
 
-  //Forced snippets frameworks
-  if (frameworkOption == "forceAppKit") {
-    return "NSColor";
-  } else if (frameworkOption == "forceUIKit") {
-    return "UIColor";
-  }
+   //Forced snippets frameworks
+   if (frameworkOption == "forceAppKit") {
+      return "NSColor";
+   } else if (frameworkOption == "forceUIKit") {
+      return "UIColor";
+   } else if (frameworkOption == "forceSwiftUI") {
+      return "Color";
+   }
 
-  //Default snippet framework
-  if (context.project.type == "osx") {
-    return "NSColor";
-  }
-  return "UIColor";
+   //Default snippet framework
+   if (context.project.type == "osx") {
+      return "NSColor";
+   }
+   return "UIColor";
 }
 
 function getColorDeclarationSwiftCode(context, color, forExport) {
-  return `static let ${camelCase(color.name)} = ${getColorSwiftCode(context, color, forExport)}`;
+   return `static let ${camelCase(color.name)} = ${getColorSwiftCode(context, color, forExport)}`;
 }
 
 function getSwiftHexInitParameterName(alphaFirst) {
-  return alphaFirst ? "argbValue" : "rgbaValue";
+   return alphaFirst ? "argbValue" : "rgbaValue";
 }
 
 function getSwiftHexColorExtension(context, alphaFirst) {
-  const parameterName = getSwiftHexInitParameterName(alphaFirst);
-  const redShifintgValue = alphaFirst ? 16 : 24;
-  const greenShiftingValue = alphaFirst ? 8 : 16;
-  const blueShiftingValue = alphaFirst ? 0 : 8;
-  const alphaShiftingValue = alphaFirst ? 24 : 0;
+   const parameterName = getSwiftHexInitParameterName(alphaFirst);
+   const redShifintgValue = alphaFirst ? 16 : 24;
+   const greenShiftingValue = alphaFirst ? 8 : 16;
+   const blueShiftingValue = alphaFirst ? 0 : 8;
+   const alphaShiftingValue = alphaFirst ? 24 : 0;
 
-  return `
+   return `
 extension ${getColorSwiftType(context, true)} {
   convenience init(${parameterName}: UInt32) {
     let red   = CGFloat((${parameterName} >> ${redShifintgValue}) & 0xff) / 255.0
